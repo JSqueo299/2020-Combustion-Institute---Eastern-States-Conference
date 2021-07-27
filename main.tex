@@ -1,0 +1,290 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                          template.tex
+%
+% LaTeX template for papers conforming to the United States Sections of
+% the Combustion Institute style guide.
+%
+% Authors:
+%     Bryan W. Weber, University of Connecticut
+%     Kyle E. Niemeyer, Oregon State University
+%  Template slightly modified for ESSCI meetings by:
+%     Perrine Pepiot, Cornell University
+%     Richard West, Northeastern University
+%
+% This work is licensed under the Creative Commons Attribution 4.0
+% International License. To view a copy of this license, visit
+% http://creativecommons.org/licenses/by/4.0/.
+%
+% The source for this template can be found at
+% https://github.com/pr-omethe-us/ussci-latex-template
+%====================================================================
+%You can use the following cite commands:
+
+%Single reference with number only: \cite{Zhao2013}
+
+%Multiple references with number only: \cite{Affleck1967,Turanyi2014,cantera}
+
+%Single reference with two or fewer authors: \textcite{Affleck1967}
+
+%Single reference with three or more authors: \textcite{Wang2011}
+
+%Two references with authors: \textcite{Kee1996,Baumgardner2013}
+
+%Three or more references with authors: \textcite{Kee1996,Baumgardner2013,Haworth2011}
+%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[12pt]{essci}
+
+\usepackage{graphicx}
+\usepackage[justification=centering]{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{subfig}
+%======================================================================
+% BibLaTeX and biber (not BibTeX) are used to process the references,
+% so these packages must be installed on your system. All configuration
+% for the bibliography and citations are done in the essci.cls file
+% Add your bibliography file here, replacing template.bib
+\addbibresource{template.bib}
+%======================================================================
+% Replace "Reaction Kinetics" in the line below by your paper topic
+\newcommand\papertopic{Fire research}
+%======================================================================
+
+\title{ A Data Based Approach for Soot Prediction in a Laminar Diffusion Flame }
+
+\author[1]{Joseph N. Squeo}
+\author[1]{Xinyu Zhao}
+%\author[2]{Author Name}
+%\author[2,*]{Author Name}
+
+\affil{Department of Mechanical Engineering, University of Connecticut, Storrs, CT 06269, United States}
+%\affil[2]{Department, Institution, Address, Country}
+\affil[*]{Corresponding author: \email{joseph.squeo@uconn.edu}}
+
+\begin{document}
+\maketitle
+
+%====================================================================
+\begin{abstract} % not to exceed 200 words
+Soot prediction in combustion systems remains a challenge due to the underlying complex physical processes and uncertainties in model parameters. The ensemble Kalman filter (EnKF) is a data assimilation technique that is widely used for state forecasting for highly nonlinear models with high dimensional data sets. This method of data assimilation combines a model, experimental measurements and their corresponding uncertainties to evolve the state forward in time for an improved state estimate. Possibilities of using the EnKF for soot model optimization in a laminar, diffusion ethylene/air flame on the Santoro co-flow burner is explored by coupling the EnKF with OpenFOAM. Experimental measurements of soot volume fraction and temperature from literature are assimilated into \textcite{Leung_Lindstedt_Jones} two-equation soot model on the fly. A baseline simulation with the original model parameters is conducted first, where discrepancy with experimental measurements is observed. With the data assimilation approach, it is shown that prediction of soot volume fraction inside the flame is insensitive to soot volume fraction measurements but exhibits greater sensitivity to temperature measurements. The EnKF prediction of soot volume fraction within the flame exhibits a greater tendency to adjust to experimental measurements when artificial temperatures are assimilated, suggesting a new means to optimize the soot model. 
+
+\end{abstract}
+
+% Provide 2-4 keywords describing your research. Only abbreviations firmly
+% established in the field may be used. These keywords will be used for
+% sessioning/indexing purposes. Use \sep between each keyword.
+\begin{keyword}
+    Soot\sep fire\sep ensemble Kalman filter\sep laminar flames
+\end{keyword}
+
+
+%====================================================================
+\section{Introduction}
+% Soot modeling
+Computational fluid dynamics based fire models are frequently employed to capture the dynamics of fire and to study its underlying physics~\cite{Roy}. Calculations of fire radiation, which play a dominant role in the growth and spread of fires, require sufficiently accurate predictions of soot concentrations. 
+%Soot is a prevailing species used in determining combustion efficiency \cite{Roy,Beji_sootFormationRates}. 
+However, significant uncertainties prevail in soot models, due to the lack of sufficient fundamental understanding of soot formation, growth and oxidation~\cite{Roy}. Most soot models require {\em ad hoc} tuning against experimental data to adequately predict soot concentrations for specific fuels and flames.
+%Soot has been a subject of continuing experimental and analytical studies with the goal of developing an improved method to capture soot concentrations produced by flames.
+% Data assimilation - Ensemble Kalman filter
+To advance the understanding of fire dynamics and to circumvent the modeling difficulties imposed by soot, a data assimilation approach is adopted in this study, which integrates experimental measurements and their uncertainties directly into a numerical simulation for an improved estimate of the state variables. 
+
+% An analysis scheme sequentially updates the model state when new observations or measurements become available.
+
+
+Sequential data assimilation is commonly used in weather forecasting, geophysics and oceanography~\cite{understanding_EnKF,Geir,IntrotoKalmanFilter}. Different data assimilation methods have been developed~\cite{Geir,WhatIstheEnKF} to obtain an estimate of a state based on observations and model dynamics. \textcite{Kalman} developed the Kalman filter (KF) to estimate the model state of a system governed by a \emph{linear} stochastic difference equation with random noises. The Kalman filter estimates the state of a linear process by minimizing the mean squared error between the model and observations through Bayesian probabilistic equations. The extended Kalman filter (EKF) adopts a similar formula as the Kalman filter, but approximates the state of \emph{non-linear} processes governed by a non-linear stochastic difference equation. Although effective, the EKF cannot account for fully non-linear dynamics and is computationally expensive due to the need to evaluate the Jacobian of the linear dynamics matrix.
+
+% Two distinct steps are used to estimate the model: an analysis step that attempts to minimize error between observations and the model in a weighted sense, and a forecast step that evolves the state forward in time \cite{Geir}. 
+
+Another approach to non-linear state estimation is accomplished with the ensemble Kalman Filter (EnKF)~\cite{understanding_EnKF,WhatIstheEnKF,Geir}, where models can be extremely high-order and non-linear, with highly uncertain initial states and a set of measurements available at discrete times. An ensemble of estimated state capturing the probability distribution of the state is propagated through the nonlinear system and the actual state is approximated by the ensemble of estimates.  Ensemble Kalman smoothers~\cite{smoother_Evensen} bear strong resemblances to the EnKF, except that an analysis is computed for all previous times up to the current time when new observations are available. 
+
+%Other filters include the unscented Kalman filter and central difference Kalman filter, where sample points are chosen deterministically. All previous measurements are accounted for in the calculation of the analysis step, effectively utilizing the history of the measurements of the system to update the state at the current time. The ensemble Kalman filter is employed in this work due to the non-linearity associated with soot prediction.
+
+% OpenFOAM simulation of laminar flame and Santoro burner
+In this study, the EnKF approach is selected to incorporate soot measurements into numerical simulations of a steady-state laminar flame. The rest of the paper is organized as follows. The test flame and simulation details are first introduced in Sec.~\ref{sec:method}. Following that, results obtained using the baseline model and the ensemble Kalman filter are discussed in Sec.~\ref{sec:result}, where the predicted soot volume fraction and temperature are compared with experimental measurements. Conclusions are finally drawn in Sec.~\ref{sec:conclusion}. 
+
+
+%====================================================================
+\section{Methods}
+\label{sec:method}
+%
+\subsection{Soot Modeling}
+%
+Soot models can be broadly classified into three categories: empirical models, semi-empirical models and detailed deterministic or stochastic models~\cite{Kennedy_sootModels}.
+%Empirical models rely on fuel-specific correlations whereas deterministic or stochastic models attempt to capture all the physics of soot formation, growth and destruction, with semi-empirical models achieving both. 
+However, the physiochemical processes of soot formation, growth and oxidation are not yet fully understood and accurate soot modeling is often limited to simple fuels and laboratory-scale flames~\cite{Roy,Beji_sootFormationRates}, especially when detailed models are employed. For the baseline simulation in this study, soot is modeled using the two-equation semi-empirical model~\cite{Leung_Lindstedt_Jones}.
+Acetylene is assumed to be the only precursor to soot in the model. Additionally, soot particles are assumed to have a constant spherical shape and surface growth is the dominant process in soot formation and growth. Incipient soot particles consist of a minimum of 100 carbon atoms resulting in a uniform radius of 1.24 nm~\cite{Leung_Lindstedt_Jones}. 
+%Their two-equation model is relatively simple to implement and offers benefits from both empirical and detailed soot models.
+
+\textcite{Roy} demonstrated that the two-equation model provides promising results after tuning to experimental data of premixed flame measurements. Similarly, \textcite{modelAssessment} successfully tuned the two-equation model to twenty-seven C$_1$-C$_3$ hydrocarbon/air diffusion flames and yielded sufficient predictions of soot volume fraction.
+Therefore, the two-equation model provides a suitable framework for both the baseline simulation and the data-assisted simulation. 
+
+% Possibly delete this paragraph? (too much detail)
+% Along with the gas-phase species conservation equations, the two-equation model solves two additional conservation equations, one for soot number density and another for soot mass fraction. The soot model assumes soot formation and destruction can be entirely represented by four main processes: nucleation, surface growth, oxidation and agglomeration. Acetylene, C\textsubscript{2}H\textsubscript{2} is assumed the only precursor species to soot in the model. Additionally, soot particles are assumed to have a constant spherical shape and surface growth is the dominant process in soot formation and growth. Incipient soot particles consist of a minimum of 100 carbon atoms resulting in a uniform radius of 1.24 nm \cite{Leung_Lindstedt_Jones}. 
+
+
+\subsection{The Test Flame}
+\label{subsec:burner}
+%
+An atmospheric laminar ethylene/air diffusion flame~\cite{Santoro} is selected as the target flame because temperature, soot volume fractions and critical species are carefully measured in the experiment. Figure~\ref{fig:Santoroburner} depicts the burner with two concentric brass tubes of 11.1 mm and 101.6 mm inner diameters, where the fuel tube exit extends 4 mm above the air flow annulus. Fuel flows through the central tube at a rate of 3.85 cm$^3$/s and air through the outer passage at 713.3 cm$^3$/s. The annular tubes contain a series of mesh screens and glass beads to ensure a uniform exit flow profile, with an additional honeycomb mesh at the exit of the air passage. Flow conditions were chosen by~\textcite{Santoro} to ensure that the laminar flame remains over-ventilated. A fixed temperature of $T=300$~K is specified for the ambient air and at the exit of the air annulus. Fuel temperature at the exit of the fuel annulus is fixed at $T=400$~K.  
+
+An open source CFD package OpenFOAM with in-house enhancement~\cite{Wu:2020} is employed to simulate the target flame. An axisymmetric wedge mesh consisting of 22280 hexahedra cells is adopted. A 32-species and 206-reaction skeletal mechanism for ethylene (C$_2$H$_2$)~\cite{Lu_skeletalMech} is incorporated to enable C$_2$H$_2$ based soot models while maintaining a reasonable computational cost. The solution is advanced in time with a time step of $\Delta t=2\times 10^{-6}$ seconds until steady-state is reached. As an example, iso-contour plots of soot volume fraction, temperature and acetylene mass fractions obtained from the baseline simulation are shown in Fig.~\ref{fig:burner_contours}. An optically-thin radiation model is employed with all the simulations. 
+%Symmetry planes are used for the outer axis-symmetric planes of the wedge.
+
+\begin{figure}
+     \centering
+     \begin{subfigure}[b]{0.24\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/Santoro_Burner.pdf}
+         \caption{Santoro burner}
+         \label{fig:Santoroburner}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.26\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/matlab_T.pdf}
+         \caption{T (K)}
+         \label{fig:T_contour}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.225\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/matlab_sootFv.pdf}
+         \caption{sootFv (m\textsuperscript{3}/m\textsuperscript{3})}
+         \label{fig:soot_contour}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.25\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/matlab_C2H2.pdf}
+         \caption{Y\textsubscript{C\textsubscript{2}H\textsubscript{2}}}
+         \label{fig:C2H2_contour}
+     \end{subfigure}
+        \caption{A schematic of the Santoro burner and iso-contours of temperature, soot volume fraction and mass fraction of C$_2$H$_2$ obtained from the baseline simulation. The dotted black lines  in (b) to (d) represent the stoichiometric mixture fraction.}
+        \label{fig:burner_contours}
+\end{figure}
+
+\subsection{Ensemble Kalman Filter (EnKF)}
+%
+The EnKF approach usually consists of a forecast step where the non-linear dynamic models are invoked and an analysis step where the experimental measurements and uncertainties are incorporated through the Kalman gain filter. The EnKF has attracted increasing attention recently assisting combustion modeling. For example, \textcite{Stanford} applied the EnKF to assimilate high-speed experimental measurements into a large-eddy simulation of a turbulent premixed flame with local extinction. The authors found that the EnKF quantitatively improved the prediction of short-term OH-LIF signals, velocity and major characteristics of local extinction sequences.
+%Consider a discrete-time non-linear system with dynamics
+%\begin{equation}
+%    x_{k+1} = f(x_k,u_k) + w_k\ ,
+%    \label{nonlinear_dynamics}
+%\end{equation}
+%and measurements
+%\begin{equation}
+%    y_k = h(x_k) + v_k\ ,
+%    \label{nonlinear_meas}
+%\end{equation}
+%where $x_{k+1}$ represents the state vector at future time $k+1$, $u_k$ is a model input vector at time $k$, $f(x_k,u_k)$ is a nonlinear function of the state vector, $h(x_k)$ is an observation operator that maps measurements to the state vector and $w_k$ and $v_k$ are zero-mean Gaussian noise processes, respectively. The initial state, $x_0$ and noises, $w_k$ and $v_k$, are assumed uncorrelated. The objective is to obtain estimates of the state $x_k$ using measurements $y_k$ so that the penalty error function is minimized in a weighted sense~\cite{WhatIstheEnKF}.
+% \textcite{Geir} introduced the ensemble Kalman filter (EnKF) as a sequential data assimilation technique used for non-linear dynamics by estimating the state using an ensemble.
+%Data assimilation is a mathematical means to combine a model, observations and uncertainty to improve the predictive capability of the model \cite{understanding_EnKF}. 
+
+In this work, the capability of the EnKF method is explored using the test flame and solver that are described in Sec.~\ref{subsec:burner}. The OpenFOAM solver serves as the non-linear dynamics model. Steady-state measurements of temperature and soot volume fraction at several heights above the burner (HABs) from experiments~\cite{Santoro,SantoroMeas} are assimilated at each time step into the model. 
+%The impact of assimilated experimental data on the prediction of soot volume fraction and temperature profiles in the flame will be discussed.
+% In the figures shown, black crosses denote assimilated experimental measurements, the solid line represents the EnKF prediction and the dotted line is the baseline OpenFOAM simulation profile.
+%\textcite{WhatIstheEnKF} found that larger ensemble sizes reduced the mean-square error between the EnKF state prediction and the actual state up to an ensemble size of $q=25$, respectively. However, due to computational cost, 
+An ensemble size of $q=10$ is used in this work. The observation operator matrix is mapped directly from the state vector at the current time step. Model noises are initialized using one standard deviation value of $\pm 5\%$ uncertainty for the soot and temperature state vectors with measurement noises reflecting the uncertainty of soot volume fraction and temperature measurements,  $\pm 25\%$ and $\pm 10\%$, respectively. A larger uncertainty for the soot model is used as compared to measurement noises in an effort to test the EnKF's ability to adjust towards measurements.
+%Model and measurement noises for temperature are kept low, assuming temperature readings are quite accurate.
+%A constant time step of $\Delta t=2\times 10^{-6}$ seconds is used, as larger time steps caused convergence failures with the solver. 
+%Preliminary results for an initial steady-state condition at $t_i=1.93$ seconds and 100 time steps are evaluated in Sec.~\ref{sec:result}.
+Preliminary results obtained from the baseline simulation and the EnKF results after 100 time steps are evaluated in Sec.~\ref{sec:result}.
+Longer run times have been tested up to 1500 time steps, although negligible changes are observed compared to those obtained after 100 steps. Computational cost is a limiting factor; one time step requires approximately four minutes wall clock time using a single processor.
+
+%and tested for soot volume fraction and temperature prediction by \textcite{Leung_Lindstedt_Jones} two-equation soot model for the laminar ethylene/air diffusion flame burning on the Santoro co-flow burner. 
+
+
+%First, the ensemble Kalman filter, based on the work of \textcite{WhatIstheEnKF}, is implemented into Matlab and verified using a transient, 1D heat conduction case in a metal rod. An aluminum rod with a length of 1 m is discretized into 100 cells and a 2nd order central difference method is used for spatial discretization with a first-order explicit Euler method for the transient terms of the heat conduction equation. The initial temperature of the rod is $T(x,0) = 300$ K with fixed temperature boundary conditions of $T(0,t) = T(L,t) = 300$ K. The EnKF adjusted towards assimilated measurements and predicted the temperature profile in the rod by minimizing the error between the simulation solver output and assimilated measurements.
+
+% An absolute valued sinusoidal source term varying with time applied at locations $L/3$ and $L/6$ of the aluminum rod. The central difference discretization coded in Matlab is used to generate measurements of temperature for purposes of testing the EnKF. The EnKF is then tested by coupling with OpenFOAM through a series of Matlab functions that call OpenFOAM through the Linux system. A modified Laplacian solver in OpenFOAM acted as the discrete nonlinear dynamics model equation in the EnKF formulation.  An identity mapping between the state and the measurement operator is utilized so that the EnKF acts to minimize the error between measurements and the actual state, in this case temperature of the metal rod. The ability of the EnKF to predict temperatures in the rod is tested against, assimilating measurements from the central finite difference code in Matlab every one-tenth of the length of the aluminum rod. Parameters of the EnKF, including model and measurement noises or uncertainties and ensemble size are varied individually and tested.
+
+%Next, the EnKF is extended to the laminar ethylene/air diffusion flame. Similar to the 1D heat conduction case, a modified OpenFOAM solver containing the two-equation model of \textcite{Leung_Lindstedt_Jones} is used as the non-linear dynamics model, replacing the model operator in the EnKF formulation. Steady-state measurements of temperature and soot volume fraction at several heights above the burner (HABs) from literature \cite{Santoro,SantoroMeas} are assimilated at each time step into the model. The impact of assimilated experimental data on the prediction of soot volume fraction and temperature profiles in the flame is discussed.
+
+
+
+%====================================================================
+\section{Results and Discussion}
+\label{sec:result}
+%
+%\subsection{Ensemble Kalman Filter Results}
+%
+%The main goal of this work is to use a data-based EnKF assimilation approach to improve the baseline model prediction of soot. 
+Figures~\ref{fig:EnKF_soot_plots} and~\ref{fig:santoroTemp} show the soot volume fraction and temperature profiles obtained from the baseline model in OpenFOAM and the EnKF prediction against experimental measurements as a function of the normalized radial distance. The error bars indicate experimental uncertainties for soot volume fraction and temperature~\cite{Santoro,SantoroMeas}, which are $\pm$25\% and $\pm$10\%, respectively.
+
+Temperature and soot measurements are assimilated into the dynamic models simultaneously in an effort to improve soot volume fraction prediction. 
+The prediction of soot volume fraction and temperature is significantly improved, indicating their sensitivity to the EnKF step. Specifically, the prediction of temperature agrees well with the experimental measurements, because temperature is more closely coupled with the thermo-chemical fields of the simulation.
+ %The filter output did not show improvement adjusting towards the measurements after increasing the duration of the simulation, ensemble sizes and decreasing measurement and model noises. 
+The prediction of soot is also improved towards the experimental measurements. However, the discrepancy between the measurements and the numerical prediction suggests a possibility of insufficient assimilation time, as soot dynamics is generally a slow physical process. In addition, soot is only weakly coupled with the rest of the thermochemical fields, as a minor species. Stronger sensitivity is anticipated if radiation from soot plays a more prominent role in determining the temperature field. More parametric studies regarding the assimilation time and the size of the ensemble will be conducted to further understand the performance of the EnKF solver. 
+%This insensitivity of soot volume fraction prediction at ndicates a possibility of insufficient assimilation time, as soot dynamics is generally a slow physical process. In addition, soot is only weakly coupled with the rest of the thermochemical fields, as a minor species. Stronger sensitivity is anticipated if radiation from soot plays a more prominent role in determining the temperature field. 
+
+\begin{figure}[h!]%
+     \centering
+     \begin{subfigure}[b]{0.33\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/Fv2.pdf}
+         \caption{$z/D = 3.6$}
+         \label{fig:2a}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.33\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/Fv3.pdf}
+         \caption{$z/D = 4.5$}
+         \label{fig:2b}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[b]{0.31\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/Fv5.pdf}
+         \caption{Centerline}
+         \label{fig:2c}
+     \end{subfigure}
+        \caption{Soot volume fractions obtained from the baseline model and from EnKF after 100 time steps.}
+        \label{fig:EnKF_soot_plots}
+\end{figure}
+
+%The four reaction rates describing the pathways for soot formation, growth and destruction in the two-equation soot model have a strong dependence on temperature. Radial profiles of temperate at select heights in Figure~\ref{fig:santoroTemp} shows the EnKF temperature significantly improves the temperature prediction of the flame. The EnKF adjusts towards all assimilated measurements. The assimilation of temperature measurements simultaneously with soot volume fraction has a minimal impact on soot prediction. However, it is speculated that the two-equation soot model in OpenFOAM needs a longer run time before the assimilated temperature measurements have a more significant impact on soot prediction. Run time is limited due to computational cost.
+
+It should be noted that the ability of the EnKF to predict soot volume fraction is dependent on available experimental data. However, the experimental data~\cite{SantoroMeas,Santoro} in this study, which are available only at select radial positions and heights above the burner, are sparse compared to the predicted numerical variables. Due to the sparsity of data, the ability of the EnKF to adjust the OpenFOAM model towards measurements is limited. 
+
+\begin{figure}[h!]
+     \centering
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/T1.pdf}
+         \caption{z/D = 1.8}
+         \label{fig:T1}
+     \end{subfigure}
+%     \hfill
+     \begin{subfigure}[b]{0.35\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{figures/T2.pdf}
+         \caption{z/D = 6.3}
+         \label{fig:T2}
+     \end{subfigure}
+        \caption{Temperature prediction using the EnKF.}
+        \label{fig:santoroTemp}
+\end{figure}
+
+%Soot formation and growth reaction pathways in the source terms of  \textcite{Leung_Lindstedt_Jones} soot model have an Arrhenius temperature-dependent reaction constant term, along with a first-order dependence on acetylene concentration. Assimilating artificially high temperatures of $T=3000$ K instead of the experimental temperatures yields significant shifts in the EnKF radial profile of soot. Forcing temperatures suggests a means for a new data-based approach in which the soot model can be tuned on the fly using assimilated temperatures. Additionally, work is ongoing to incorporate reaction rate terms from the soot model in with the state vector in an attempt to effectively tune the two-equation model on the fly using the EnKF. 
+
+%====================================================================
+\section{Conclusions}
+\label{sec:conclusion}
+%
+A new method for soot model optimization is explored using a data-based approach. The ensemble Kalman filter data assimilation technique is coupled with an OpenFOAM simulation of a laminar ethylene/air diffusion flame. Soot volume fractions and temperatures reported from experiments are assimilated in an effort to improve the model prediction of soot concentration on the fly.
+The radial profiles of temperature are significantly improved, with the EnKF approach. Prediction of soot volume fractions is also adjusted towards experimental data, although the gaps between the two suggest longer assimilation period to accommodate the slow dynamics of soot. The preliminary investigation shows that the data assimilation technique is a promising method to improve soot prediction. Future work includes more parametric studies of the EnKF solvers to further quantify its performance in combustion applications.
+%Assimilated soot volume fraction measurements have a negligible impact on the EnKF forecast. Due to the small perturbations of soot volume fraction from the EnKF adjustments, the OpenFOAM solver needs a longer run time to properly reflect changes to the steady-state measurements. Temperature profiles as a function of radial distance at select heights above the burner are significantly improved using the EnKF. The assimilation of artificial temperatures has a significant impact on soot volume fraction prediction of the EnKF, providing insight into a new means of model tuning. Data assimilation techniques offer a means to adjust soot models on the fly by assimilating experimental measurements. Work is ongoing on the topic of soot model optimization using data-based approaches.
+
+%====================================================================
+\section{Acknowledgements}
+This study is supported by FM Global within the framework of the FM Global Strategic Research Program on Fire Modeling.
+
+
+
+
+
+\printbibliography
+
+\end{document}
